@@ -54,6 +54,11 @@ See `topology/` for the full labelled diagram.
 Week4-Network-Security-ACL/
 ├── README.md
 ├── Week4_Report.pdf
+├── Week4_Report.docx
+├── configs/
+│   ├── R1_running-config.txt
+│   ├── SW1_running-config.txt
+│   └── SW2_running-config.txt
 ├── screenshots/
 │   └── (numbered verification screenshots — see report for index)
 └── topology/
