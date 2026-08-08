@@ -1,0 +1,114 @@
+# Week 6 — Enterprise WAN Technologies and High Availability
+
+**ITSimplera Solutions | Network Administration Internship Program**
+
+| | |
+|---|---|
+| **Prepared by** | Inshrah |
+| **Registration No.** | NETB01-0022 |
+| **Submitted to** | Jawad Qayum (Senior Network Administrator) |
+| **Department** | Network Administration |
+| **Submission Date** | 8 August 2026 |
+
+---
+
+## Overview
+
+This project implements a multi-branch enterprise WAN in GNS3, connecting
+Headquarters to five branch offices — Lahore, Karachi, Islamabad, Peshawar,
+and Multan — using secure point-to-point WAN links, dynamic routing, and a
+redundant backup path. The goal is to demonstrate that every branch retains
+connectivity to Headquarters even if its primary WAN link fails, with no
+manual intervention required.
+
+---
+
+## Topology
+
+- **15** Cisco c3745 routers
+- **6** Ethernet switches
+- **6** client PCs (VPCS)
+
+**Router groups:**
+
+| Group | Routers | Role |
+|---|---|---|
+| Primary (EDGE1) | HQ-EDGE1, LHR-EDGE1, KHI-EDGE1, ISB-EDGE1, PEW-EDGE1, MUL-EDGE1 | Chain topology carrying primary WAN traffic; each also serves the site LAN (switch + 2 PCs) |
+| Backup (EDGE2) | HQ-EDGE2, LHR-EDGE2, KHI-EDGE2, ISB-EDGE2, PEW-EDGE2, MUL-EDGE2 | Connected internally to their site's EDGE1 and externally to the core mesh; no LAN traffic |
+| Core transit | CORE-T1, CORE-T2, CORE-T3 | Backbone ring carrying the backup path between branch EDGE2 routers and HQ-EDGE2 |
+
+**Primary chain:** `HQ → LHR → KHI → ISB → PEW → MUL`
+**Backup mesh:** `Branch EDGE2 → CORE-T1 / T2 / T3 (ring) → HQ-EDGE2` (via GRE tunnels)
+
+---
+
+## Technologies Implemented
+
+| Technology | Details |
+|---|---|
+| **PPP + CHAP** | Enabled on every WAN-facing serial link; each router authenticates its neighbor by hostname/password before the link passes traffic |
+| **OSPF** | Single-area (Area 0) process on all 15 routers, using one wildcard network statement |
+| **GRE Tunnels** | Logical tunnels between HQ-EDGE2 and every branch EDGE2, sourced from loopback addresses so they stay stable regardless of the underlying physical path |
+| **Floating Static Routes** | Default route (AD 150) on each branch EDGE1 pointing to its local EDGE2, activating automatically if the primary OSPF route is withdrawn |
+| **NAT/PAT** | Overload (PAT) configured on HQ-EDGE1 for LAN-to-WAN address translation |
+
+---
+
+## Repository Structure
+
+```
+.
+├── configs/              15 router startup-config files (.cfg)
+├── screenshots/          Verification evidence
+│   ├── 01_topology/
+│   ├── 02_ppp-chap/
+│   ├── 03_ospf/
+│   ├── 04_gre-tunnel/
+│   ├── 05_floating-static/
+│   ├── 06_nat-pat/
+│   └── 07_ping-traceroute/
+├── topology/              GNS3 project file (.gns3)
+├── Week6_Report.docx      Full written documentation
+└── README.md              This file
+```
+
+---
+
+## IP Addressing Scheme
+
+| Link Category | Subnet Pattern | Size | Purpose |
+|---|---|---|---|
+| LAN segments | `10.10.S.0/24` | /24 | Switch + PCs at each site |
+| Primary chain links | `10.20.N.0/30` | /30 | HQ → LHR → KHI → ISB → PEW → MUL |
+| Internal links | `10.30.S.0/30` | /30 | EDGE1 ↔ EDGE2 at each site |
+| Backup / core mesh | `10.40.N.0/30` | /30 | EDGE2 ↔ CORE-T, and CORE-T ring |
+| GRE tunnels | `10.50.N.0/30` | /30 | HQ-EDGE2 ↔ each branch EDGE2 |
+| Loopbacks | `10.99.0.R/32` | /32 | OSPF router-id, tunnel source/destination |
+
+---
+
+## Verification Summary
+
+- ✅ All WAN links show `Encapsulation PPP, LCP Open` — PPP/CHAP authentication successful
+- ✅ OSPF neighbors in `FULL` state across the primary chain, internal links, and GRE tunnels
+- ✅ GRE tunnels `up/up` between HQ-EDGE2 and branch EDGE2 routers
+- ✅ Floating static routes present (`S* 0.0.0.0/0 [150/0]`) on every branch EDGE1
+- ✅ NAT/PAT configuration active on HQ-EDGE1 (inside/outside interfaces, overload)
+- ✅ End-to-end ping and traceroute successful between branch PCs and HQ across multiple test paths
+
+---
+
+## Key Design Decisions
+
+- **Chain topology instead of a star** for primary links, to distribute port
+  load across routers rather than concentrating it on HQ.
+- **Separate EDGE1/EDGE2 routers per site**, connected by an internal link,
+  so that a primary-link failure on EDGE1 can hand traffic to EDGE2's
+  independent backup path without any change at the end-user PCs.
+- **Single-area OSPF**, appropriate for a network of this size — multi-area
+  hierarchy would add configuration overhead without benefit at 15 routers.
+
+---
+
+*This repository was submitted as part of the Week 6 assignment for the
+IT-Simplera Institute Network Administration Internship Program.*
